@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html> 
+<head> 
+    <title>Mission Visual</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #x3dContainer {
+            width: 100%;
+            height: 95%;
+        }
+
+        /* Style for the top container */
+        #fileInput, #reset, #discard {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 9999;
+            margin: 5px;
+        }
+
+        #reset {
+            right: 50px; /* Adjust the position to separate the buttons */
+        }
+
+        #discard {
+            right: 270px; /* Adjust the position to separate the buttons */
+        }
+    </style>            
+    <script type='text/javascript' src='http://www.x3dom.org/download/x3dom.js'></script>
+    <link rel='stylesheet' type='text/css' href='http://www.x3dom.org/download/x3dom.css'></link>
+</head>
+<body>
+    <input type="file" id="fileInput" accept=".js" />
+    <input type="button" id="reset" value="Reset" onclick="resetVisualization();" />
+    <input type="button" id="discard" value="Discard File" onclick="discardFile();" />
+    <div id="x3dContainer">
+        <X3D xmlns="http://www.web3d.org/specifications/x3d-namespace"
+            showStat="false" showLog="false" x="0px" y="0px" width="100%" height="100%">
+            <div id="demo"></div>
+            <Scene>
+                <background DEF='bgnd' transparency='0' skyColor='0.0 0.0 0.0'></background>
+                <Transform id="theEarth" translation="0 0 0">
+                    <Shape>
+                        <Appearance>
+                            <Material diffuseColor='0.2 0.2 1' />
+                        </Appearance>
+                        <Sphere radius='0.7' />
+                    </Shape>
+                </Transform>
+                <Viewpoint fieldOfView="0.785398" position="6 5.5 6.5" orientation="1 -1 0 -0.785" description centerofrotaion="0, 0, 0" znear=" -1" zfar="-1">
+                </Viewpoint>
+            </Scene>
+        </X3D>
+    </div>
+
+    <script>
+        var mission;
+        var simulationInterval;
+
+        function startSimulation() {
+            console.log("Starting simulation...");
+            var segIndex = 0; // segment counter
+            var orbitCoords = "";
+
+            mission.coordinates.forEach((coordinate, index) => {
+                var s = document.createElement('Shape'); // Shape Node
+                s.setAttribute("id", "segment" + segIndex);
+                var app = document.createElement('Appearance'); // Appearance Node
+                var mat = document.createElement('Material'); // Material Node
+                mat.setAttribute("id", "Mat" + segIndex);
+                mat.setAttribute("diffuseColor", "1 0 0");
+                mat.setAttribute("emissiveColor", "1 0 0.3");
+                app.appendChild(mat);
+                s.appendChild(app);
+                var segCoords = [
+                    coordinate.X / 10000,
+                    coordinate.Y / 10000,
+                    coordinate.Z / 10000
+                ];
+                console.log("Segment:", segCoords);
+                orbitCoords = orbitCoords + segCoords[0] + " " + segCoords[1] + " " + segCoords[2] + " ";
+                var line = document.createElement('IndexedLineSet');
+                line.setAttribute("coordIndex", segIndex);
+                var coords = document.createElement('Coordinate');
+                coords.setAttribute("point", orbitCoords);
+                line.appendChild(coords);
+                s.appendChild(line);
+                var ot = document.getElementById('theEarth');
+                ot.appendChild(s);
+                segIndex++;
+            });
+
+            var pos = [mission.coordinates[0].X / 10000, mission.coordinates[0].Y / 10000, mission.coordinates[0].Z / 10000];
+            var t = document.createElement('Transform'); // create a transform object
+            t.setAttribute("translation", pos[0] + " " + pos[1] + " " + pos[2]);
+            t.setAttribute("id", 'satPosition');
+            var satellite = document.createElement('Shape'); // Shape Node for satellite
+            satellite.setAttribute("id", "satellite");
+            var satapp = document.createElement('Appearance'); // Appearance Node
+            var satmat = document.createElement('Material'); // Material Node
+            satmat.setAttribute("id", "SatMat");
+            satmat.setAttribute("diffuseColor", "0 1 0");
+            satmat.setAttribute("emissiveColor", "0 1 0.3");
+            satapp.appendChild(satmat);
+            satellite.appendChild(satapp);
+            var satmodel = document.createElement('Box');
+            satmodel.setAttribute("size", "0.2 0.2 0.2");
+            satellite.appendChild(satmodel);
+            t.appendChild(satellite);
+            var objsat = document.getElementById('theEarth');
+            objsat.appendChild(t);
+            simulationInterval = setInterval(updatePosition, 50);
+        }
+
+        var step = 0;
+
+        function updatePosition() {
+            if (step >= mission.coordinates.length) {
+                clearInterval(simulationInterval);
+                return;
+            }
+
+            var pos = [mission.coordinates[step].X / 10000, mission.coordinates[step].Y / 10000, mission.coordinates[step].Z / 10000];
+            var Xpos = pos[0];
+            var Ypos = pos[1];
+            var Zpos = pos[2];
+            document.getElementById('satPosition').setAttribute('translation', Xpos + " " + Ypos + " " + Zpos);
+            console.log("Update position:", pos);
+            document.getElementById("demo").innerHTML = "<p><H2>Date: " + mission.coordinates[step].Date + " Time: " + mission.coordinates[step].Time + "</H2><p>";
+            step++;
+        }
+
+        function resetVisualization() {
+            clearInterval(simulationInterval);
+            step = 0;
+            var pos = [mission.coordinates[step].X / 10000, mission.coordinates[step].Y / 10000, mission.coordinates[step].Z / 10000];
+            document.getElementById('satPosition').setAttribute('translation', pos[0] + " " + pos[1] + " " + pos[2]);
+            simulationInterval = setInterval(updatePosition, 50);
+        }
+
+        function discardFile() {
+            clearInterval(simulationInterval);
+            step = 0;
+            mission = null;
+            document.getElementById('fileInput').value = "";
+            document.getElementById('theEarth').innerHTML = '';
+            var theEarth = document.createElement('Transform');
+            theEarth.setAttribute('id', 'theEarth');
+            theEarth.setAttribute('translation', '0 0 0');
+            var shape = document.createElement('Shape');
+            var appearance = document.createElement('Appearance');
+            var material = document.createElement('Material');
+            material.setAttribute('diffuseColor', '0.2 0.2 1');
+            appearance.appendChild(material);
+            var sphere = document.createElement('Sphere');
+            sphere.setAttribute('radius', '0.7');
+            shape.appendChild(appearance);
+            shape.appendChild(sphere);
+            theEarth.appendChild(shape);
+            document.querySelector('Scene').appendChild(theEarth);
+            console.log("File discarded and screen cleared. Ready for a new upload.");
+        }
+
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            var reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    var script = document.createElement('script');
+                    script.textContent = event.target.result;
+                    document.body.appendChild(script);
+                    console.log("Script content:", script.textContent);  // Log script content for debugging
+
+                    setTimeout(function() {
+                        if (typeof trajectory === 'undefined') {
+                            console.error("trajectory is not defined in the uploaded file.");
+                            alert("The uploaded file does not define a trajectory variable.");
+                            return;
+                        }
+
+                        mission = trajectory;
+                        console.log("File uploaded successfully:", mission);
+                        startSimulation();
+                    }, 100); // Add a small delay to ensure the script execution
+                } catch (error) {
+                    console.error("Error loading file:", error);
+                }
+            };
+            reader.readAsText(file);
+        });
+
+        if (typeof trajectory !== 'undefined') {
+            mission = trajectory;
+            startSimulation();  // Initialize the simulation on page load using the existing mission variable
+        } else {
+            console.log("Initial trajectory not defined.");
+        }
+    </script>
+    <script type="text/javascript" src="x3dom.js"></script>
+</body>
+</html>
